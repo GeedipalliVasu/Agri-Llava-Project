@@ -1,0 +1,34 @@
+.disease-vis-container {
+  padding: 28px;
+  text-align: center;
+  background: linear-gradient(180deg, #fbfff9, #eefaf0);
+  min-height: 60vh;
+}
+
+.muted { color: #556b56; margin-top: -6px; }
+
+.controls { display:flex; gap:12px; align-items:center; justify-content:center; margin:14px 0 20px; }
+.btn { background:#2f7a2f; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; }
+.btn.secondary { background:#4b9a4b; }
+.btn:disabled { opacity:.6; cursor:not-allowed; }
+
+.vis-area { display:flex; gap:20px; align-items:flex-start; justify-content:center; flex-wrap:wrap; }
+.image-stack { position:relative; width:520px; max-width:72vw; min-width:260px; }
+.base-img, .overlay-img { width:100%; height:auto; display:block; border-radius:12px; box-shadow:0 6px 16px rgba(0,0,0,0.18); }
+.overlay-img { position:absolute; left:0; top:0; mix-blend-mode: multiply; pointer-events:none; }
+
+.vis-info { max-width:380px; text-align:left; }
+.pred-line { margin:8px 0; font-size:15px; }
+.controls-row { display:flex; gap:12px; align-items:center; margin-top:8px; }
+.opacity-control input[type=range] { vertical-align:middle; margin-left:8px; }
+
+.seg-preview img { max-width:260px; border-radius:8px; border:2px solid #e6f8e6; box-shadow:0 4px 10px rgba(0,0,0,0.12); }
+
+.legend { display:flex; gap:12px; margin-top:10px; flex-wrap:wrap; }
+.legend-item { display:flex; gap:8px; align-items:center; }
+.color-box { width:18px; height:18px; border-radius:4px; border:1px solid #999; }
+
+@media (max-width: 720px) {
+  .vis-area { flex-direction:column; align-items:center; }
+  .vis-info { max-width:90%; }
+}

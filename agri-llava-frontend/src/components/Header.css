@@ -1,0 +1,61 @@
+.header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 15px 30px;
+  background: linear-gradient(to right, #ffffff, #f8f9fa);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.auth-buttons {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.auth-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #2e9961, #1d7f1d);
+  color: white;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(29, 127, 29, 0.2);
+}
+
+.auth-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(29, 127, 29, 0.3);
+  background: linear-gradient(145deg, #1d7f1d, #186818);
+}
+
+.logout-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #ff4757, #dc3545);
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+}
+
+.logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  background: linear-gradient(145deg, #dc3545, #c82333);
+}
+
+.user-info {
+  margin-right: 20px;
+  font-weight: 600;
+  color: #2e7d32;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
