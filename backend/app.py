@@ -9,25 +9,62 @@ import bcrypt
 import cv2
 import jwt
 import numpy as np
-import torch
-import torch.nn as nn
 from bson.objectid import ObjectId
 from flask import Flask, jsonify, request, send_from_directory, url_for
 from flask_cors import CORS
 from gridfs import GridFS
 from PIL import Image
 from pymongo import MongoClient
-from torchvision import transforms
 import logging
 
-try:
-    from diffusers import StableDiffusionImg2ImgPipeline
+# Check if running on Render (production) to avoid loading heavy ML libs at startup
+# to prevent OOM on small instances
+_is_render = 'RENDER' in os.environ
+_is_production = os.getenv('ENV', '').lower() == 'production' or _is_render
 
-    _diffusers_available = True
-    _diffusers_err = None
-except Exception as _e:
-    _diffusers_available = False
-    _diffusers_err = str(_e)
+# Conditionally import heavy ML libraries
+# On production/Render, these will be lazy-loaded on first use
+if not _is_production:
+    import torch
+    import torch.nn as nn
+    from torchvision import transforms
+else:
+    torch = None
+    nn = None
+    transforms = None
+
+_diffusers_available = False
+_diffusers_err = None
+
+
+def _lazy_load_torch():
+    """Lazily import torch and related modules on first use."""
+    global torch, nn, transforms
+    if torch is None:
+        try:
+            import torch as _torch
+            import torch.nn as _nn
+            from torchvision import transforms as _transforms
+            torch = _torch
+            nn = _nn
+            transforms = _transforms
+        except Exception as e:
+            raise RuntimeError(f"Failed to load torch: {e}")
+    return torch, nn, transforms
+
+
+def _lazy_load_diffusers():
+    """Lazily import diffusers on first use."""
+    global _diffusers_available, _diffusers_err
+    if _diffusers_available:
+        return
+    try:
+        from diffusers import StableDiffusionImg2ImgPipeline
+        _diffusers_available = True
+        _diffusers_err = None
+    except Exception as _e:
+        _diffusers_available = False
+        _diffusers_err = str(_e)
 
 # -----------------------\n# Flask Setup\n# -----------------------
 app = Flask(__name__, static_folder='static/frontend', static_url_path='')
@@ -229,35 +266,49 @@ def auth_logout():
     return resp
 
 
-# -----------------------\n# CNN Model Definition\n# -----------------------
-class LeafCNN(nn.Module):
-    def __init__(self, num_classes):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(3, 32, 3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, 3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(128 * 16 * 16, 256),
-            nn.ReLU(),
-            nn.Dropout(0.4),
-            nn.Linear(256, num_classes),
-        )
+# -----------------------\n# CNN Model Definition (lazy-loaded)\n# -----------------------
+_LeafCNN = None
 
-    def forward(self, x):
-        x = self.conv(x)
-        x = x.view(x.size(0), -1)
-        return self.fc(x)
+
+def get_LeafCNN():
+    """Lazily define and return the LeafCNN class."""
+    global _LeafCNN
+    if _LeafCNN is not None:
+        return _LeafCNN
+    
+    _torch, _nn, _ = _lazy_load_torch()
+    
+    class LeafCNN(_nn.Module):
+        def __init__(self, num_classes):
+            super().__init__()
+            self.conv = _nn.Sequential(
+                _nn.Conv2d(3, 32, 3, padding=1),
+                _nn.BatchNorm2d(32),
+                _nn.ReLU(),
+                _nn.MaxPool2d(2),
+                _nn.Conv2d(32, 64, 3, padding=1),
+                _nn.BatchNorm2d(64),
+                _nn.ReLU(),
+                _nn.MaxPool2d(2),
+                _nn.Conv2d(64, 128, 3, padding=1),
+                _nn.BatchNorm2d(128),
+                _nn.ReLU(),
+                _nn.MaxPool2d(2),
+            )
+            self.fc = _nn.Sequential(
+                _nn.Linear(128 * 16 * 16, 256),
+                _nn.ReLU(),
+                _nn.Dropout(0.4),
+                _nn.Linear(256, num_classes),
+            )
+
+        def forward(self, x):
+            x = self.conv(x)
+            x = x.view(x.size(0), -1)
+            return self.fc(x)
+    
+    _LeafCNN = LeafCNN
+    return _LeafCNN
 
 
 # ---------------------------------\n# Grad-CAM Function (Helper)\n# ---------------------------------
@@ -803,27 +854,56 @@ def _normalize_entry_percentages(entry: dict) -> dict:
     return entry
 
 
-# -----------------------\n# Model Loading\n# -----------------------
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# -----------------------\n# Model Loading (Lazy)\n# -----------------------
+_model_device = None
+_model = None
+_transform = None
+
+class_names = ["Potato___Early_blight", "Potato___Late_blight", "Potato___healthy"]
+num_classes = len(class_names)
 model_path = os.path.join(os.path.dirname(__file__), "cnn_leaf_model.pth")
 
-# --- IMPORTANT: Make sure this list is correct ---\n# You MUST get this list from your training script
-class_names = ["Potato___Early_blight", "Potato___Late_blight", "Potato___healthy"]
-# -------------------------------------------------------------------
 
-num_classes = len(class_names)
-model = LeafCNN(num_classes=num_classes).to(device)
-model.load_state_dict(torch.load(model_path, map_location=device))
-model.eval()
+def get_device():
+    """Get torch device (CPU or GPU)."""
+    global _model_device
+    if _model_device is None:
+        _torch, _, _ = _lazy_load_torch()
+        _model_device = _torch.device("cuda" if _torch.cuda.is_available() else "cpu")
+    return _model_device
 
-# -----------------------\n# Image Transform\n# -----------------------
-transform = transforms.Compose(
-    [
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-    ]
-)
+
+def get_model():
+    """Lazily load the CNN model."""
+    global _model
+    if _model is not None:
+        return _model
+    
+    _torch, _, _ = _lazy_load_torch()
+    LeafCNN = get_LeafCNN()
+    device = get_device()
+    
+    _model = LeafCNN(num_classes=num_classes).to(device)
+    _model.load_state_dict(_torch.load(model_path, map_location=device))
+    _model.eval()
+    return _model
+
+
+def get_transform():
+    """Get image transform."""
+    global _transform
+    if _transform is not None:
+        return _transform
+    
+    _, _, _transforms = _lazy_load_torch()
+    _transform = _transforms.Compose(
+        [
+            _transforms.Resize((128, 128)),
+            _transforms.ToTensor(),
+            _transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+        ]
+    )
+    return _transform
 
 
 # -------------------------------------------------\n# --- This is the single /predict Endpoint ---\n# --- It matches your React component's request ---\n# -------------------------------------------------
