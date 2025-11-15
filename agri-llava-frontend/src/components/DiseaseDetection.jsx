@@ -9,6 +9,7 @@ function DiseaseDetection() {
   const navigate = useNavigate();
   const auth = useAuth();
   const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+  const isProduction = API_BASE.includes("onrender.com");
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState("");
   const [result, setResult] = useState("");
@@ -97,11 +98,24 @@ function DiseaseDetection() {
   return (
     <div className="disease-container">
       <h2>🌾 Crop Disease Detection</h2>
+      {isProduction && (
+        <div style={{ 
+          backgroundColor: '#fff3cd', 
+          border: '1px solid #ffc107', 
+          padding: '12px', 
+          borderRadius: '4px', 
+          marginBottom: '16px',
+          color: '#856404'
+        }}>
+          <p><strong>Note:</strong> Disease detection is currently unavailable on this deployment (requires GPU). 
+          Please use a local version or contact support for GPU deployment options.</p>
+        </div>
+      )}
       <div className="upload-section">
-        <input type="file" accept="image/*" onChange={handleImageChange} />
+        <input type="file" accept="image/*" onChange={handleImageChange} disabled={isProduction} />
         {preview && <img src={preview} alt="Preview" className="preview-img" />}
-        <button onClick={handlePredict} disabled={loading}>
-          {loading ? "Predicting..." : "Predict"}
+        <button onClick={handlePredict} disabled={loading || isProduction}>
+          {isProduction ? "Unavailable (GPU Required)" : loading ? "Predicting..." : "Predict"}
         </button>
       </div>
 
