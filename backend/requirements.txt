@@ -10,3 +10,5 @@ safetensors
 PyJWT
 bcrypt
 gunicorn
+opencv-python
+pymongo
