@@ -3,7 +3,8 @@ import { Navigate, useLocation } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+// Use relative URL by default so requests go to the same origin the page was loaded from
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
