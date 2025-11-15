@@ -909,6 +909,14 @@ def get_transform():
 # -------------------------------------------------\n# --- This is the single /predict Endpoint ---\n# --- It matches your React component's request ---\n# -------------------------------------------------
 @app.route("/predict", methods=["POST"])
 def predict():
+    # On Render production, torch is not loaded to save memory
+    # Return a graceful error message
+    if _is_production and torch is None:
+        return jsonify({
+            "error": "Disease detection is not available on this deployment (requires GPU). "
+                     "Please use a local version or contact support for ML features."
+        }), 503
+    
     if "image" not in request.files:
         return jsonify({"error": "No image file provided"}), 400
 
@@ -1066,6 +1074,14 @@ _img2img_pipe = None
 
 @app.route("/generate_stages", methods=["POST"])
 def generate_stages():
+    # On Render production, diffusers is not available
+    # Return a graceful error message
+    if _is_production and torch is None:
+        return jsonify({
+            "error": "Image generation is not available on this deployment (requires GPU and diffusers). "
+                     "Please use a local version or contact support for ML features."
+        }), 503
+    
     global _diffusers_available, _diffusers_err
     if not _diffusers_available:
         # Retry lazy import here to catch newly installed packages after server start
