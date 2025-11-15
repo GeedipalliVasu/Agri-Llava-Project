@@ -1755,6 +1755,25 @@ def serve_frontend(path='index.html'):
     return jsonify({"error": "index.html not found. Did you build the frontend?"}), 404
 
 
+# -----------------------\n# Catch-all route for SPA\n# -----------------------
+# Serve index.html for all non-API routes so React Router can handle client-side routing
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_spa(path):
+    """Serve the frontend SPA, handling all non-API routes."""
+    # Don't serve index.html for API routes, timeline, history, or static assets
+    if path.startswith(('api/', 'timeline', 'history', 'assets/', 'auth/', 'predict', 'generate_stages')):
+        # Let Flask's normal routing handle these
+        return None
+    
+    # For all other routes (including /login, /home, etc.), serve index.html
+    # so React Router can handle client-side navigation
+    index_path = os.path.join(app.static_folder, "index.html")
+    if os.path.exists(index_path):
+        return send_from_directory(app.static_folder, "index.html")
+    return jsonify({"error": "index.html not found. Did you build the frontend?"}), 404
+
+
 # -----------------------\n# Run Server\n# -----------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
