@@ -32,9 +32,11 @@ except Exception as _e:
 # -----------------------\n# Flask Setup\n# -----------------------
 app = Flask(__name__, static_folder='static/frontend', static_url_path='')
 
-# Import and register routes
-from timeline_routes import timeline_bp
-from history_routes import history_bp
+# Import and register routes (use package-qualified imports so imports work
+# when gunicorn loads `backend.app` as a module)
+from backend.timeline_routes import timeline_bp
+from backend.history_routes import history_bp
+
 app.register_blueprint(timeline_bp, url_prefix='/timeline')
 app.register_blueprint(history_bp, url_prefix='/history')
 
